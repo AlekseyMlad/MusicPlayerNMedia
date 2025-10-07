@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">MusicPlayerNMedia</string>
+    <string name="album">Album</string>
+    <string name="artist">Artist</string>
+    <string name="previous_track">Previous Track</string>
+    <string name="play_pause">Play/Pause</string>
+    <string name="next_track">Next Track</string>
+</resources>
