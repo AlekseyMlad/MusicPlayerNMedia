@@ -5,5 +5,5 @@ data class Track(
     val file: String,
     val albumTitle: String,
     val duration: Int = 0,
-    var isPlaying: Boolean = false
+    val isPlaying: Boolean = false
 )

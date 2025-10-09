@@ -1,33 +1,52 @@
 package ru.netology.nmedia
 
 import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import ru.netology.nmedia.dto.PlayerState
 import ru.netology.nmedia.dto.Track
+import java.io.IOException
 
-class MusicPlayer(private val onStateChanged: (PlayerState) -> Unit) {
+class MusicPlayer {
 
     private var mediaPlayer: MediaPlayer = MediaPlayer()
     private var currentTrack: Track? = null
     private var currentTrackIndex: Int = -1
     private var tracks: List<Track> = emptyList()
 
-    private val _playerState = MutableLiveData(PlayerState(false, null, 0))
+    private val _playerState = MutableLiveData(PlayerState())
     val playerState: LiveData<PlayerState>
         get() = _playerState
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val progressUpdateRunnable = object : Runnable {
+        override fun run() {
+            if (mediaPlayer.isPlaying) {
+                updatePlayerState()
+                handler.postDelayed(this, 1000)
+            }
+        }
+    }
+
     init {
-        mediaPlayer.setOnCompletionListener { 
+        mediaPlayer.setOnCompletionListener {
             playNext()
         }
         mediaPlayer.setOnPreparedListener {
             mediaPlayer.start()
+            val duration = mediaPlayer.duration
+            currentTrack = currentTrack?.copy(duration = duration)
             updatePlayerState()
+            handler.post(progressUpdateRunnable)
         }
         mediaPlayer.setOnErrorListener { _, _, _ ->
             updatePlayerState()
             true
+        }
+        mediaPlayer.setOnSeekCompleteListener {
+            updatePlayerState()
         }
     }
 
@@ -41,17 +60,27 @@ class MusicPlayer(private val onStateChanged: (PlayerState) -> Unit) {
             currentTrackIndex = index
             currentTrack = track
             mediaPlayer.reset()
-            mediaPlayer.setDataSource(track.file)
-            mediaPlayer.prepareAsync()
-            updatePlayerState()
+            try {
+                mediaPlayer.setDataSource(track.file)
+                mediaPlayer.prepareAsync()
+                updatePlayerState()
+            } catch (e: IOException) {
+                // Handle error
+            }
         }
     }
 
     fun playPause() {
         if (mediaPlayer.isPlaying) {
             mediaPlayer.pause()
+            handler.removeCallbacks(progressUpdateRunnable)
         } else {
-            mediaPlayer.start()
+            if (currentTrack == null && tracks.isNotEmpty()) {
+                play(tracks.first())
+            } else {
+                mediaPlayer.start()
+                handler.post(progressUpdateRunnable)
+            }
         }
         updatePlayerState()
     }
@@ -72,12 +101,14 @@ class MusicPlayer(private val onStateChanged: (PlayerState) -> Unit) {
 
     fun seekToProgress(progress: Int) {
         val duration = mediaPlayer.duration
-        val seekPosition = (duration * progress / 100)
-        mediaPlayer.seekTo(seekPosition)
-        updatePlayerState()
+        if (duration > 0) {
+            val seekPosition = (duration * progress / 100)
+            mediaPlayer.seekTo(seekPosition)
+        }
     }
 
     fun release() {
+        handler.removeCallbacks(progressUpdateRunnable)
         mediaPlayer.release()
     }
 
@@ -89,6 +120,5 @@ class MusicPlayer(private val onStateChanged: (PlayerState) -> Unit) {
                 progress = if (mediaPlayer.duration > 0) (mediaPlayer.currentPosition * 100 / mediaPlayer.duration) else 0
             )
         )
-        onStateChanged(_playerState.value!!)
     }
 }

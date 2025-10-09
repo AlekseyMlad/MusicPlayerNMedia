@@ -43,18 +43,7 @@ class MainActivity : AppCompatActivity() {
             if (!isSeeking) {
                 binding.progress.progress = state.progress
             }
-
-            val currentTrackId = state.currentTrack?.id
-            val isPlaying = state.isPlaying
-
-            val needsUpdate = adapter.currentList.any { it.isPlaying != (it.id == currentTrackId && isPlaying) }
-
-            if (needsUpdate) {
-                val updatedTracks = adapter.currentList.map {
-                    it.copy(isPlaying = it.id == currentTrackId && isPlaying)
-                }
-                adapter.submitList(updatedTracks)
-            }
+            adapter.updatePlayerState(state)
         }
 
         viewModel.errorEvent.observe(this) { message ->

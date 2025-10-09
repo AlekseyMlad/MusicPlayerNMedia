@@ -6,9 +6,11 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import android.media.MediaMetadataRetriever
+import okhttp3.Response
 import ru.netology.nmedia.MusicPlayer
 import ru.netology.nmedia.dto.Album
 import ru.netology.nmedia.dto.PlayerState
@@ -23,10 +25,13 @@ class TrackViewModel(application: Application) : AndroidViewModel(application) {
         .build()
     private val gson = Gson()
     private val albumType = object : TypeToken<Album>() {}.type
+    private var call: Call? = null
 
     companion object {
-        private const val ALBUM_URL = "https://github.com/netology-code/andad-homeworks/raw/master/09_multimedia/data/album.json"
-        private const val BASE_URL = "https://github.com/netology-code/andad-homeworks/raw/master/09_multimedia/data/"
+        private const val ALBUM_URL =
+            "https://github.com/netology-code/andad-homeworks/raw/master/09_multimedia/data/album.json"
+        private const val BASE_URL =
+            "https://raw.githubusercontent.com/netology-code/andad-homeworks/master/09_multimedia/data/"
     }
 
     private val _album = MutableLiveData<Album>()
@@ -38,8 +43,12 @@ class TrackViewModel(application: Application) : AndroidViewModel(application) {
     private val _errorEvent = MutableLiveData<String?>()
     val errorEvent: LiveData<String?> = _errorEvent
 
-    val musicPlayer = MusicPlayer { state ->
-        _playerState.postValue(state)
+    val musicPlayer = MusicPlayer()
+
+    init {
+        musicPlayer.playerState.observeForever { state ->
+            _playerState.postValue(state)
+        }
     }
 
     fun getAlbum() {
@@ -47,27 +56,23 @@ class TrackViewModel(application: Application) : AndroidViewModel(application) {
             .url(ALBUM_URL)
             .build()
 
-        client.newCall(request)
-            .enqueue(object : okhttp3.Callback {
-                override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
-                    val body = response.body?.string() ?: throw RuntimeException("body is null")
-                    val album = gson.fromJson<Album>(body, albumType)
-                    val retriever = MediaMetadataRetriever()
-                    val tracksWithData = album.tracks.map { track ->
-                        retriever.setDataSource(BASE_URL + track.file, HashMap<String, String>())
-                        val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toInt() ?: 0
-                        track.copy(albumTitle = album.title, duration = duration)
-                    }
-                    retriever.release()
-                    val albumWithTracks = album.copy(tracks = tracksWithData)
-                    _album.postValue(albumWithTracks)
-                    musicPlayer.setTracks(albumWithTracks.tracks)
+        call = client.newCall(request)
+        call?.enqueue(object : Callback {
+            override fun onResponse(call: Call, response: Response) {
+                val body = response.body?.string() ?: throw RuntimeException("body is null")
+                val album = gson.fromJson<Album>(body, albumType)
+                val tracksWithData = album.tracks.map { track ->
+                    track.copy(file = BASE_URL + track.file, albumTitle = album.title)
                 }
+                val albumWithTracks = album.copy(tracks = tracksWithData)
+                _album.postValue(albumWithTracks)
+                musicPlayer.setTracks(albumWithTracks.tracks)
+            }
 
-                override fun onFailure(call: okhttp3.Call, e: IOException) {
-                    _errorEvent.postValue("Не удалось загрузить альбом")
-                }
-            })
+            override fun onFailure(call: Call, e: IOException) {
+                _errorEvent.postValue("Не удалось загрузить альбом")
+            }
+        })
     }
 
     fun onErrorShown() {
@@ -97,5 +102,6 @@ class TrackViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         super.onCleared()
         musicPlayer.release()
+        call?.cancel()
     }
 }
