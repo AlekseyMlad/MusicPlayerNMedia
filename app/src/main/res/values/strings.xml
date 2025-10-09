@@ -5,4 +5,6 @@
     <string name="previous_track">Previous Track</string>
     <string name="play_pause">Play/Pause</string>
     <string name="next_track">Next Track</string>
+    <string name="album_load_error">Не удалось загрузить альбом</string>
+    <string name="unknown_duration">--:--</string>
 </resources>

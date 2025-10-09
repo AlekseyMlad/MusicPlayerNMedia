@@ -4,10 +4,8 @@ import android.os.Bundle
 import android.widget.SeekBar
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import ru.netology.nmedia.adapter.OnInteractionListener
 import ru.netology.nmedia.adapter.TrackAdapter
 import ru.netology.nmedia.databinding.ActivityMainBinding
-import ru.netology.nmedia.dto.Track
 import ru.netology.nmedia.viewmodel.TrackViewModel
 
 class MainActivity : AppCompatActivity() {
@@ -21,65 +19,54 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        val adapter = TrackAdapter(object : OnInteractionListener {
-            override fun onPlay(track: Track) {
-                viewModel.play(track)
-            }
-        })
+        val adapter = TrackAdapter({ viewModel.play(it) })
         binding.trackList.adapter = adapter
 
         binding.progress.max = 1000
 
-        viewModel.album.observe(this) { albumData ->
-            binding.albumTitle.text = albumData.title
-            binding.artist.text = albumData.artist
-            binding.published.text = albumData.published
-            binding.genre.text = albumData.genre
-            adapter.submitList(albumData.tracks)
-        }
-
-        viewModel.playerState.observe(this) { state ->
-            binding.play.setImageResource(
-                if (state.isPlaying) R.drawable.ic_pause_circle_48 else R.drawable.ic_play_circle_48
-            )
-            if (!isSeeking) {
-                binding.progress.progress = state.progress * 10
-            }
-            adapter.updatePlayerState(state)
-        }
-
-        viewModel.errorEvent.observe(this) { message ->
-            message?.let {
-                android.widget.Toast.makeText(this, it, android.widget.Toast.LENGTH_LONG).show()
-                viewModel.onErrorShown()
-            }
-        }
-
-        binding.progress.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                // Nothing to do here
+        viewModel.apply {
+            album.observe(this@MainActivity) { albumData ->
+                binding.albumTitle.text = albumData.title
+                binding.artist.text = albumData.artist
+                binding.published.text = albumData.published
+                binding.genre.text = albumData.genre
+                adapter.submitList(albumData.tracks)
             }
 
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {
-                isSeeking = true
+            playerState.observe(this@MainActivity) { state ->
+                binding.play.setImageResource(
+                    if (state.isPlaying) R.drawable.ic_pause_circle_48 else R.drawable.ic_play_circle_48
+                )
+                if (!isSeeking) {
+                    binding.progress.progress = state.progress * 10
+                }
+                adapter.updatePlayerState(state)
             }
 
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                viewModel.seekToProgress(seekBar.progress)
-                isSeeking = false
+            errorEvent.observe(this@MainActivity) { message ->
+                message?.let {
+                    android.widget.Toast.makeText(this@MainActivity, it, android.widget.Toast.LENGTH_LONG).show()
+                    onErrorShown()
+                }
             }
-        })
-
-        binding.play.setOnClickListener {
-            viewModel.playPause()
         }
 
-        binding.next.setOnClickListener {
-            viewModel.playNext()
-        }
+        binding.apply {
+            progress.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {}
 
-        binding.prev.setOnClickListener {
-            viewModel.playPrevious()
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                    isSeeking = true
+                }
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) {
+                    viewModel.seekToProgress(seekBar.progress)
+                    isSeeking = false
+                }
+            })
+            play.setOnClickListener { viewModel.playPause() }
+            next.setOnClickListener { viewModel.playNext() }
+            prev.setOnClickListener { viewModel.playPrevious() }
         }
 
         viewModel.getAlbum()

@@ -16,6 +16,7 @@ import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import ru.netology.nmedia.R
 import ru.netology.nmedia.MusicPlayer
 import ru.netology.nmedia.dto.Album
 import ru.netology.nmedia.dto.PlayerState
@@ -47,10 +48,12 @@ class TrackViewModel(application: Application) : AndroidViewModel(application) {
 
     val musicPlayer = MusicPlayer()
 
+    private val playerObserver = androidx.lifecycle.Observer<PlayerState> { state ->
+        _playerState.postValue(state)
+    }
+
     init {
-        musicPlayer.playerState.observeForever { state ->
-            _playerState.postValue(state)
-        }
+        musicPlayer.playerState.observeForever(playerObserver)
     }
 
     fun getAlbum() {
@@ -73,7 +76,7 @@ class TrackViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             override fun onFailure(call: Call, e: IOException) {
-                _errorEvent.postValue("Не удалось загрузить альбом")
+                _errorEvent.postValue(getApplication<Application>().getString(R.string.album_load_error))
             }
         })
     }
@@ -127,6 +130,7 @@ class TrackViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         super.onCleared()
         musicPlayer.release()
+        musicPlayer.playerState.removeObserver(playerObserver)
         call?.cancel()
     }
 }

@@ -3,6 +3,7 @@ package ru.netology.nmedia
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import ru.netology.nmedia.dto.PlayerState
@@ -32,25 +33,27 @@ class MusicPlayer {
     }
 
     init {
-        mediaPlayer.setOnCompletionListener {
-            isPrepared = false
-            playNext()
-        }
-        mediaPlayer.setOnPreparedListener {
-            isPrepared = true
-            mediaPlayer.start()
-            updatePlayerState()
-            handler.post(progressUpdateRunnable)
-        }
-        mediaPlayer.setOnErrorListener { _, _, _ ->
-            isPrepared = false
-            updatePlayerState()
-            true
-        }
-        mediaPlayer.setOnSeekCompleteListener {
-            updatePlayerState()
-            if (isPrepared && mediaPlayer.isPlaying) {
+        mediaPlayer.apply {
+            setOnCompletionListener {
+                isPrepared = false
+                playNext()
+            }
+            setOnPreparedListener {
+                isPrepared = true
+                start()
+                updatePlayerState()
                 handler.post(progressUpdateRunnable)
+            }
+            setOnErrorListener { _, _, _ ->
+                isPrepared = false
+                updatePlayerState()
+                true
+            }
+            setOnSeekCompleteListener {
+                updatePlayerState()
+                if (isPrepared && isPlaying) {
+                    handler.post(progressUpdateRunnable)
+                }
             }
         }
     }
@@ -69,8 +72,8 @@ class MusicPlayer {
             try {
                 mediaPlayer.setDataSource(track.file)
                 mediaPlayer.prepareAsync()
-            } catch (_: IOException) {
-                // Handle error
+            } catch (e: IOException) {
+                Log.e("MusicPlayer", "Error setting data source", e)
             }
             updatePlayerState()
         }
@@ -92,17 +95,17 @@ class MusicPlayer {
     }
 
     fun playNext() {
-        if (tracks.isNotEmpty()) {
-            currentTrackIndex = (currentTrackIndex + 1) % tracks.size
-            play(tracks[currentTrackIndex])
-        }
+        navigateTo(1)
     }
 
     fun playPrevious() {
-        if (tracks.isNotEmpty()) {
-            currentTrackIndex = (currentTrackIndex - 1 + tracks.size) % tracks.size
-            play(tracks[currentTrackIndex])
-        }
+        navigateTo(-1)
+    }
+
+    private fun navigateTo(offset: Int) {
+        if (tracks.isEmpty()) return
+        currentTrackIndex = (currentTrackIndex + offset + tracks.size) % tracks.size
+        play(tracks[currentTrackIndex])
     }
 
     fun seekToProgress(progress: Int) {

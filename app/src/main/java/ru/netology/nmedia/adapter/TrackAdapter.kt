@@ -6,11 +6,12 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.TrackItemBinding
 import ru.netology.nmedia.dto.PlayerState
 import ru.netology.nmedia.dto.Track
 
-interface OnInteractionListener {
+fun interface OnInteractionListener {
     fun onPlay(track: Track)
 }
 
@@ -63,15 +64,7 @@ class TrackViewHolder(
             trackName.text = track.file.substringAfterLast("/")
             albumName.text = track.albumTitle
 
-            val duration = track.duration
-            trackDuration.text = if (duration > 0) {
-                val durationInSeconds = duration / 1000
-                val minutes = durationInSeconds / 60
-                val seconds = durationInSeconds % 60
-                String.format("%d:%02d", minutes, seconds)
-            } else {
-                "--:--"
-            }
+            trackDuration.text = formatDuration(track.duration)
 
             playIndicator.visibility = if (adapter.isPlaying(track)) View.VISIBLE else View.INVISIBLE
 
@@ -79,6 +72,14 @@ class TrackViewHolder(
                 onInteractionListener.onPlay(track)
             }
         }
+    }
+
+    private fun formatDuration(millis: Int): String {
+        if (millis <= 0) return binding.root.context.getString(R.string.unknown_duration)
+        val totalSeconds = millis / 1000
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        return String.format("%d:%02d", minutes, seconds)
     }
 }
 
