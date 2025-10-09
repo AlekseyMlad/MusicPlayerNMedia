@@ -87,7 +87,7 @@ class TrackViewModel(application: Application) : AndroidViewModel(application) {
                         retriever.setDataSource(it.file, HashMap<String, String>())
                         val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toInt() ?: 0
                         it.copy(duration = duration)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         it
                     } finally {
                         retriever.release()

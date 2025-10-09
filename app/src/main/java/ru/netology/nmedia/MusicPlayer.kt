@@ -69,7 +69,7 @@ class MusicPlayer {
             try {
                 mediaPlayer.setDataSource(track.file)
                 mediaPlayer.prepareAsync()
-            } catch (e: IOException) {
+            } catch (_: IOException) {
                 // Handle error
             }
             updatePlayerState()
@@ -110,11 +110,9 @@ class MusicPlayer {
             handler.removeCallbacks(progressUpdateRunnable)
             val duration = mediaPlayer.duration
             if (duration > 0) {
-                var seekPosition = (duration * progress / 100)
-                if (seekPosition >= duration) {
-                    seekPosition = duration - 1
-                }
-                mediaPlayer.seekTo(seekPosition)
+                val newPosition = (duration.toLong() * progress) / 1000L
+                val safePosition = newPosition.coerceIn(0, (duration - 200).toLong().coerceAtLeast(0))
+                mediaPlayer.seekTo(safePosition.toInt())
             }
         }
     }

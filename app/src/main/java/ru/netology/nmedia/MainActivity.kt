@@ -28,6 +28,8 @@ class MainActivity : AppCompatActivity() {
         })
         binding.trackList.adapter = adapter
 
+        binding.progress.max = 1000
+
         viewModel.album.observe(this) { albumData ->
             binding.albumTitle.text = albumData.title
             binding.artist.text = albumData.artist
@@ -41,7 +43,7 @@ class MainActivity : AppCompatActivity() {
                 if (state.isPlaying) R.drawable.ic_pause_circle_48 else R.drawable.ic_play_circle_48
             )
             if (!isSeeking) {
-                binding.progress.progress = state.progress
+                binding.progress.progress = state.progress * 10
             }
             adapter.updatePlayerState(state)
         }
