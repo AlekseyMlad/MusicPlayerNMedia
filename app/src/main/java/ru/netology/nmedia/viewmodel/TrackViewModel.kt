@@ -1,11 +1,16 @@
 package ru.netology.nmedia.viewmodel
 
 import android.app.Application
+import android.media.MediaMetadataRetriever
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
@@ -16,13 +21,10 @@ import ru.netology.nmedia.dto.Album
 import ru.netology.nmedia.dto.PlayerState
 import ru.netology.nmedia.dto.Track
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 
 class TrackViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .build()
+    private val client = OkHttpClient()
     private val gson = Gson()
     private val albumType = object : TypeToken<Album>() {}.type
     private var call: Call? = null
@@ -61,18 +63,41 @@ class TrackViewModel(application: Application) : AndroidViewModel(application) {
             override fun onResponse(call: Call, response: Response) {
                 val body = response.body?.string() ?: throw RuntimeException("body is null")
                 val album = gson.fromJson<Album>(body, albumType)
-                val tracksWithData = album.tracks.map { track ->
+                val tracksWithUrls = album.tracks.map { track ->
                     track.copy(file = BASE_URL + track.file, albumTitle = album.title)
                 }
-                val albumWithTracks = album.copy(tracks = tracksWithData)
-                _album.postValue(albumWithTracks)
-                musicPlayer.setTracks(albumWithTracks.tracks)
+                val albumWithUrls = album.copy(tracks = tracksWithUrls)
+                _album.postValue(albumWithUrls)
+                musicPlayer.setTracks(albumWithUrls.tracks)
+                fetchDurations(albumWithUrls)
             }
 
             override fun onFailure(call: Call, e: IOException) {
                 _errorEvent.postValue("Не удалось загрузить альбом")
             }
         })
+    }
+
+    private fun fetchDurations(album: Album) {
+        viewModelScope.launch {
+            val tracksWithDurations = withContext(Dispatchers.IO) {
+                album.tracks.map {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(it.file, HashMap<String, String>())
+                        val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toInt() ?: 0
+                        it.copy(duration = duration)
+                    } catch (e: Exception) {
+                        it
+                    } finally {
+                        retriever.release()
+                    }
+                }
+            }
+            val albumWithDurations = album.copy(tracks = tracksWithDurations)
+            _album.postValue(albumWithDurations)
+            musicPlayer.setTracks(albumWithDurations.tracks)
+        }
     }
 
     fun onErrorShown() {

@@ -15,6 +15,7 @@ class MusicPlayer {
     private var currentTrack: Track? = null
     private var currentTrackIndex: Int = -1
     private var tracks: List<Track> = emptyList()
+    private var isPrepared = false
 
     private val _playerState = MutableLiveData(PlayerState())
     val playerState: LiveData<PlayerState>
@@ -23,7 +24,7 @@ class MusicPlayer {
     private val handler = Handler(Looper.getMainLooper())
     private val progressUpdateRunnable = object : Runnable {
         override fun run() {
-            if (mediaPlayer.isPlaying) {
+            if (isPrepared && mediaPlayer.isPlaying) {
                 updatePlayerState()
                 handler.postDelayed(this, 1000)
             }
@@ -32,21 +33,25 @@ class MusicPlayer {
 
     init {
         mediaPlayer.setOnCompletionListener {
+            isPrepared = false
             playNext()
         }
         mediaPlayer.setOnPreparedListener {
+            isPrepared = true
             mediaPlayer.start()
-            val duration = mediaPlayer.duration
-            currentTrack = currentTrack?.copy(duration = duration)
             updatePlayerState()
             handler.post(progressUpdateRunnable)
         }
         mediaPlayer.setOnErrorListener { _, _, _ ->
+            isPrepared = false
             updatePlayerState()
             true
         }
         mediaPlayer.setOnSeekCompleteListener {
             updatePlayerState()
+            if (isPrepared && mediaPlayer.isPlaying) {
+                handler.post(progressUpdateRunnable)
+            }
         }
     }
 
@@ -59,25 +64,26 @@ class MusicPlayer {
         if (index != -1) {
             currentTrackIndex = index
             currentTrack = track
+            isPrepared = false
             mediaPlayer.reset()
             try {
                 mediaPlayer.setDataSource(track.file)
                 mediaPlayer.prepareAsync()
-                updatePlayerState()
             } catch (e: IOException) {
                 // Handle error
             }
+            updatePlayerState()
         }
     }
 
     fun playPause() {
-        if (mediaPlayer.isPlaying) {
+        if (isPrepared && mediaPlayer.isPlaying) {
             mediaPlayer.pause()
             handler.removeCallbacks(progressUpdateRunnable)
         } else {
             if (currentTrack == null && tracks.isNotEmpty()) {
                 play(tracks.first())
-            } else {
+            } else if (isPrepared) {
                 mediaPlayer.start()
                 handler.post(progressUpdateRunnable)
             }
@@ -100,10 +106,16 @@ class MusicPlayer {
     }
 
     fun seekToProgress(progress: Int) {
-        val duration = mediaPlayer.duration
-        if (duration > 0) {
-            val seekPosition = (duration * progress / 100)
-            mediaPlayer.seekTo(seekPosition)
+        if (isPrepared) {
+            handler.removeCallbacks(progressUpdateRunnable)
+            val duration = mediaPlayer.duration
+            if (duration > 0) {
+                var seekPosition = (duration * progress / 100)
+                if (seekPosition >= duration) {
+                    seekPosition = duration - 1
+                }
+                mediaPlayer.seekTo(seekPosition)
+            }
         }
     }
 
@@ -113,6 +125,16 @@ class MusicPlayer {
     }
 
     private fun updatePlayerState() {
+        if (!isPrepared) {
+            _playerState.postValue(
+                PlayerState(
+                    isPlaying = false,
+                    currentTrack = currentTrack,
+                    progress = 0
+                )
+            )
+            return
+        }
         _playerState.postValue(
             PlayerState(
                 isPlaying = mediaPlayer.isPlaying,

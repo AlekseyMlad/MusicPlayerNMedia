@@ -20,30 +20,18 @@ class TrackAdapter(private val onInteractionListener: OnInteractionListener) :
     private var playerState: PlayerState? = null
 
     fun updatePlayerState(state: PlayerState) {
-        val previousState = playerState
-        val currentState = state
+        val previousId = playerState?.currentTrack?.id
+        val currentId = state.currentTrack?.id
         playerState = state
 
-        val previousTrackId = previousState?.currentTrack?.id
-        val currentTrackId = currentState.currentTrack?.id
-
-        if (previousTrackId != currentTrackId) {
-            val previousIndex = currentList.indexOfFirst { it.id == previousTrackId }
+        if (previousId != currentId) {
+            val previousIndex = currentList.indexOfFirst { it.id == previousId }
             if (previousIndex != -1) {
                 notifyItemChanged(previousIndex)
             }
-            val currentIndex = currentList.indexOfFirst { it.id == currentTrackId }
+            val currentIndex = currentList.indexOfFirst { it.id == currentId }
             if (currentIndex != -1) {
                 notifyItemChanged(currentIndex)
-            }
-        } else if (currentTrackId != null) {
-            val previousDuration = previousState?.currentTrack?.duration ?: 0
-            val currentDuration = currentState.currentTrack?.duration ?: 0
-            if (previousDuration != currentDuration) {
-                val currentIndex = currentList.indexOfFirst { it.id == currentTrackId }
-                if (currentIndex != -1) {
-                    notifyItemChanged(currentIndex)
-                }
             }
         }
     }
@@ -61,10 +49,6 @@ class TrackAdapter(private val onInteractionListener: OnInteractionListener) :
     fun isPlaying(track: Track): Boolean {
         return playerState?.isPlaying == true && playerState?.currentTrack?.id == track.id
     }
-
-    fun getTrackDuration(track: Track): Int {
-        return playerState?.currentTrack?.takeIf { it.id == track.id }?.duration ?: track.duration
-    }
 }
 
 class TrackViewHolder(
@@ -79,7 +63,7 @@ class TrackViewHolder(
             trackName.text = track.file.substringAfterLast("/")
             albumName.text = track.albumTitle
 
-            val duration = adapter.getTrackDuration(track)
+            val duration = track.duration
             trackDuration.text = if (duration > 0) {
                 val durationInSeconds = duration / 1000
                 val minutes = durationInSeconds / 60
